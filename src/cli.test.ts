@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { buildSvg } from "./cli.js";
 import { GIT_LOG_FORMAT } from "./parser.js";
 
-const SEP = "\x01";
+const SEP = "|";
 
 function makeLogLine(sha: string, subject: string, iso: string): string {
   return [sha, "Author", "a@b.com", iso, subject].join(SEP);
