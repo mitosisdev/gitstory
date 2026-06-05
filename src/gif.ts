@@ -7,9 +7,31 @@ const TIMELINE_Y = 150;
 const DOT_RADIUS = 4;
 const MARGIN = 50;
 const BG_COLOR: [number, number, number] = [0x0b, 0x0d, 0x10];
-const DOT_COLOR: [number, number, number] = [0x8a, 0x2b, 0xe2];
 const FRAME_DELAY = 40; // ms
 const FINAL_HOLD = 2000; // ms
+
+const AUTHOR_PALETTE: Array<[number, number, number]> = [
+  [0x8a, 0x2b, 0xe2], // purple (original)
+  [0x00, 0xbc, 0x8c], // teal
+  [0xe7, 0x4c, 0x3c], // red
+  [0xf3, 0x9c, 0x12], // orange
+  [0x27, 0x9b, 0xff], // blue
+  [0xff, 0x6b, 0x6b], // pink
+];
+
+/** Build a map from author name to RGB color, assigning palette colors in order of first appearance. */
+export function buildAuthorColorMap(
+  commits: Commit[],
+): Map<string, [number, number, number]> {
+  const map = new Map<string, [number, number, number]>();
+  for (const commit of commits) {
+    if (!map.has(commit.authorName)) {
+      const color = AUTHOR_PALETTE[map.size % AUTHOR_PALETTE.length]!;
+      map.set(commit.authorName, color);
+    }
+  }
+  return map;
+}
 
 /** Fill a pixel buffer (RGBA, row-major) with the background color. */
 function fillBackground(rgba: Uint8Array): void {
@@ -53,6 +75,9 @@ export function renderGif(commits: Commit[]): Buffer {
   const pixelCount = CANVAS_WIDTH * CANVAS_HEIGHT;
   const rgba = new Uint8Array(pixelCount * 4);
 
+  // Build per-author color map once
+  const colorMap = buildAuthorColorMap(commits);
+
   // Compute dot x-positions (chronological order, left-to-right)
   const count = commits.length;
   const usableWidth = CANVAS_WIDTH - 2 * MARGIN;
@@ -74,7 +99,8 @@ export function renderGif(commits: Commit[]): Buffer {
       // Each frame: redraw background + all dots up to and including `frame`
       fillBackground(rgba);
       for (let j = 0; j <= frame; j++) {
-        drawCircle(rgba, dotX[j]!, TIMELINE_Y, DOT_RADIUS, DOT_COLOR);
+        const dotColor = colorMap.get(commits[j]!.authorName) ?? AUTHOR_PALETTE[0]!;
+        drawCircle(rgba, dotX[j]!, TIMELINE_Y, DOT_RADIUS, dotColor);
       }
 
       const palette = quantize(rgba, 256);
