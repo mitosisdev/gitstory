@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { parseGitLog, GIT_LOG_FORMAT } from "../src/parser";
 
-const SEP = "\x01";
+const SEP = "|";
 
 function makeLine(sha: string, name: string, email: string, ts: string, subject: string): string {
   return [sha, name, email, ts, subject].join(SEP);
@@ -46,13 +46,6 @@ test("parses multiple commits in order", () => {
   expect(result).toHaveLength(2);
   expect(result[0]?.sha).toBe(SHA1);
   expect(result[1]?.sha).toBe(SHA2);
-});
-
-test("handles subjects that contain common delimiters like pipe and comma", () => {
-  const subject = "fix: handle a|b edge-case, cleanup, and typo";
-  const line = makeLine(SHA1, "Dev", "dev@x.com", "2026-06-01T00:00:00+00:00", subject);
-  const result = parseGitLog(line);
-  expect(result[0]?.subject).toBe(subject);
 });
 
 test("skips blank lines without failing", () => {

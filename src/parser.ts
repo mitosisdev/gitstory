@@ -1,9 +1,8 @@
 // src/parser.ts — parse git log output into a typed Commit[] array.
 //
-// Expected log format (use --format=%H%x01%an%x01%ae%x01%aI%x01%s):
-//   <sha>\x01<authorName>\x01<authorEmail>\x01<isoTimestamp>\x01<subject>
-// One commit per line. Fields are separated by ASCII Unit Separator (\x01)
-// so subjects containing common delimiters (|, tab, comma) parse correctly.
+// Expected log format (use --format="%H|%an|%ae|%aI|%s"):
+//   <sha>|<authorName>|<authorEmail>|<isoTimestamp>|<subject>
+// One commit per line. Fields are separated by pipe (|).
 
 export interface Commit {
   sha: string;
@@ -13,14 +12,14 @@ export interface Commit {
   subject: string;
 }
 
-const SEP = "\x01";
+const SEP = "|";
 const FIELDS = 5;
 
-export function parseGitLog(log: string): Commit[] {
-  if (!log.trim()) return [];
+export function parseGitLog(raw: string): Commit[] {
+  if (!raw.trim()) return [];
 
   const commits: Commit[] = [];
-  for (const line of log.split("\n")) {
+  for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
@@ -32,7 +31,7 @@ export function parseGitLog(log: string): Commit[] {
       authorName: parts[1] ?? "",
       authorEmail: parts[2] ?? "",
       isoTimestamp: parts[3] ?? "",
-      subject: parts.slice(4).join(SEP), // rejoin in case subject contained SEP
+      subject: parts.slice(4).join(SEP),
     });
   }
 
@@ -40,4 +39,4 @@ export function parseGitLog(log: string): Commit[] {
 }
 
 // The git log format string to pass to --format=
-export const GIT_LOG_FORMAT = "%H\x01%an\x01%ae\x01%aI\x01%s";
+export const GIT_LOG_FORMAT = "%H|%an|%ae|%aI|%s";
