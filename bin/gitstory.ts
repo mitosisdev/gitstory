@@ -8,6 +8,9 @@ const args = process.argv.slice(2);
 const outputIdx = args.indexOf("--output");
 const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
 
+const repoNameIdx = args.indexOf("--repo-name");
+const repoName = repoNameIdx !== -1 ? args[repoNameIdx + 1] : undefined;
+
 let logInput: string;
 
 if (!process.stdin.isTTY) {
@@ -23,7 +26,7 @@ if (!process.stdin.isTTY) {
   logInput = result.stdout.toString("utf8");
 }
 
-const svg = buildSvg(logInput);
+const svg = buildSvg(logInput, repoName);
 
 if (outputFile) {
   writeFileSync(outputFile, svg, "utf8");
