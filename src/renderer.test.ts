@@ -123,4 +123,77 @@ describe("renderTimeline", () => {
     const svg = renderTimeline([JAN]);
     expect(svg).toContain('height="160"');
   });
+
+  // ── contributor legend tests ───────────────────────────────────────────────
+
+  it("shows top author name in legend", () => {
+    const commits: Commit[] = [
+      { sha: "a1", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-01T00:00:00Z", subject: "feat: one" },
+      { sha: "a2", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-02T00:00:00Z", subject: "feat: two" },
+      { sha: "b1", authorName: "Bob", authorEmail: "bob@x.com", isoTimestamp: "2026-01-03T00:00:00Z", subject: "fix: three" },
+    ];
+    const svg = renderTimeline(commits);
+    expect(svg).toContain("Alice");
+  });
+
+  it("shows commit count next to author name", () => {
+    const commits: Commit[] = [
+      { sha: "a1", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-01T00:00:00Z", subject: "feat: one" },
+      { sha: "a2", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-02T00:00:00Z", subject: "feat: two" },
+      { sha: "b1", authorName: "Bob", authorEmail: "bob@x.com", isoTimestamp: "2026-01-03T00:00:00Z", subject: "fix: three" },
+    ];
+    const svg = renderTimeline(commits);
+    // Alice has 2 commits — the count "2" should appear in the legend
+    expect(svg).toContain("2 commits");
+  });
+
+  it("sorts legend by commit count descending (top author first)", () => {
+    const commits: Commit[] = [
+      { sha: "b1", authorName: "Bob", authorEmail: "bob@x.com", isoTimestamp: "2026-01-01T00:00:00Z", subject: "fix: one" },
+      { sha: "a1", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-02T00:00:00Z", subject: "feat: two" },
+      { sha: "a2", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-03T00:00:00Z", subject: "feat: three" },
+    ];
+    const svg = renderTimeline(commits);
+    const alicePos = svg.indexOf("Alice");
+    const bobPos = svg.indexOf("Bob");
+    expect(alicePos).toBeGreaterThan(-1);
+    expect(bobPos).toBeGreaterThan(-1);
+    // Alice (2 commits) appears before Bob (1 commit)
+    expect(alicePos).toBeLessThan(bobPos);
+  });
+
+  it("limits legend to top 5 authors", () => {
+    // Use generic commit subjects so author names only appear in the legend
+    const authorNames = ["Alice", "Bob", "Carol", "Dave", "Eve", "Frank"];
+    const commits: Commit[] = authorNames.flatMap((name, i) =>
+      Array.from({ length: 6 - i }, (_, j) => ({
+        sha: `${name}${j}`,
+        authorName: name,
+        authorEmail: `${name.toLowerCase()}@x.com`,
+        isoTimestamp: `2026-01-0${j + 1}T00:00:00Z`,
+        subject: `feat: commit`,
+      }))
+    );
+    const svg = renderTimeline(commits);
+    // Frank is the 6th author (fewest commits) and should NOT appear in the legend
+    expect(svg).not.toContain("Frank");
+    // Alice through Eve (top 5) should appear in the legend
+    expect(svg).toContain("Alice");
+    expect(svg).toContain("Eve");
+  });
+
+  it("does not render legend for empty commits", () => {
+    const svg = renderTimeline([]);
+    // No legend section in empty SVG
+    expect(svg).not.toContain("Contributors");
+  });
+
+  it("escapes XML special characters in author names in legend", () => {
+    const commits: Commit[] = [
+      { sha: "x1", authorName: "O'Brien <test>", authorEmail: "x@x.com", isoTimestamp: "2026-01-01T00:00:00Z", subject: "feat: one" },
+    ];
+    const svg = renderTimeline(commits);
+    expect(svg).not.toContain("<test>");
+    expect(svg).toContain("&lt;test&gt;");
+  });
 });

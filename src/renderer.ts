@@ -6,6 +6,7 @@ const MARGIN = 50;
 const TIMELINE_Y = 100;
 const DOT_R = 4;
 const MAX_LABEL_CHARS = 22;
+const MAX_LEGEND_AUTHORS = 5;
 
 // Visual spec colours
 const BG_COLOR = "#0b0d10";
@@ -13,6 +14,45 @@ const DOT_COLOR = "#8A2BE2";
 const AXIS_COLOR = "#334155";
 const LABEL_COLOR = "#94a3b8";
 const HEADING_COLOR = "#e2e8f0";
+const LEGEND_HEADING_COLOR = "#cbd5e1";
+const LEGEND_ITEM_COLOR = "#94a3b8";
+
+interface AuthorCount {
+  name: string;
+  count: number;
+}
+
+function buildAuthorCounts(commits: Commit[]): AuthorCount[] {
+  const map = new Map<string, number>();
+  for (const c of commits) {
+    map.set(c.authorName, (map.get(c.authorName) ?? 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, MAX_LEGEND_AUTHORS);
+}
+
+function buildLegend(authors: AuthorCount[], svgHeight: number): string[] {
+  const lines: string[] = [];
+  const legendX = CANVAS_WIDTH - MARGIN;
+  const legendStartY = svgHeight - (authors.length * 14 + 18);
+
+  lines.push(
+    `  <text x="${legendX}" y="${legendStartY}" font-size="10" font-family="monospace" text-anchor="end" fill="${LEGEND_HEADING_COLOR}" font-weight="bold">Contributors</text>`,
+  );
+
+  for (let i = 0; i < authors.length; i++) {
+    const author = authors[i]!;
+    const y = legendStartY + 14 + i * 14;
+    const label = `${escapeXml(author.name)} — ${author.count} commits`;
+    lines.push(
+      `  <text x="${legendX}" y="${y}" font-size="10" font-family="monospace" text-anchor="end" fill="${LEGEND_ITEM_COLOR}">${label}</text>`,
+    );
+  }
+
+  return lines;
+}
 
 export function renderTimeline(commits: Commit[], repoName?: string): string {
   const headingHeight = repoName ? 30 : 0;
@@ -73,6 +113,12 @@ export function renderTimeline(commits: Commit[], repoName?: string): string {
   }
 
   lines.push(...dots);
+
+  const authorCounts = buildAuthorCounts(commits);
+  if (authorCounts.length > 0) {
+    lines.push(...buildLegend(authorCounts, svgHeight));
+  }
+
   lines.push("</svg>");
   return lines.join("\n");
 }
