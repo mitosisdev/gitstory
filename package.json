@@ -5,5 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "bun test"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }

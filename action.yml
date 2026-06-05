@@ -1,0 +1,27 @@
+name: 'gitstory'
+description: 'Generate an animated commit timeline SVG for any git repo'
+inputs:
+  repo-path:
+    description: 'Path to the git repository to visualize'
+    required: false
+    default: '.'
+  out:
+    description: 'Output file path for the generated SVG'
+    required: false
+    default: 'timeline.svg'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    - name: Install gitstory
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}
+    - name: Generate timeline
+      shell: bash
+      run: |
+        git -C "${{ inputs.repo-path }}" log --format="%H|%an|%ae|%aI|%s" \
+          | bun ${{ github.action_path }}/bin/gitstory.ts --output "${{ inputs.out }}"
