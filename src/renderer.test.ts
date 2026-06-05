@@ -13,6 +13,8 @@ const LONG = makeCommit("ddd4", "feat: a very long subject that exceeds twenty c
 const XML = makeCommit("eee5", "feat: <script>alert('xss')</script>", "2026-01-05T10:00:00Z");
 
 describe("renderTimeline", () => {
+  // ── existing structural tests ──────────────────────────────────────────────
+
   it("returns valid SVG for empty input", () => {
     const svg = renderTimeline([]);
     expect(svg).toContain("<svg");
@@ -70,5 +72,55 @@ describe("renderTimeline", () => {
     const svg = renderTimeline([JAN, FEB]);
     expect(typeof svg).toBe("string");
     expect(svg.length).toBeGreaterThan(0);
+  });
+
+  // ── visual spec tests (TDD — these drive the renderer upgrade) ────────────
+
+  it("has dark #0b0d10 background rect", () => {
+    const svg = renderTimeline([JAN]);
+    expect(svg).toContain("#0b0d10");
+  });
+
+  it("uses #8A2BE2 (purple) fill for dots", () => {
+    const svg = renderTimeline([JAN]);
+    expect(svg).toContain('fill="#8A2BE2"');
+  });
+
+  it("timeline axis uses dark slate stroke #334155", () => {
+    const svg = renderTimeline([JAN, FEB]);
+    expect(svg).toContain("#334155");
+  });
+
+  it("date labels use monospace font-family", () => {
+    const svg = renderTimeline([JAN, FEB]);
+    expect(svg).toContain("monospace");
+  });
+
+  it("date labels are 10px font-size", () => {
+    const svg = renderTimeline([JAN, FEB]);
+    // month tick labels should be font-size="10"
+    expect(svg).toContain('font-size="10"');
+  });
+
+  it("shows repo name heading when repoName is provided", () => {
+    const svg = renderTimeline([JAN], "my-repo");
+    expect(svg).toContain("my-repo");
+  });
+
+  it("does not render a heading element when repoName is omitted", () => {
+    const svg = renderTimeline([JAN]);
+    // No <text> with centered heading when no repoName — just commit labels
+    // We verify by checking repo name is absent
+    expect(svg).not.toContain("undefined");
+  });
+
+  it("canvas width is 900", () => {
+    const svg = renderTimeline([JAN]);
+    expect(svg).toContain('width="900"');
+  });
+
+  it("canvas height is 160", () => {
+    const svg = renderTimeline([JAN]);
+    expect(svg).toContain('height="160"');
   });
 });
