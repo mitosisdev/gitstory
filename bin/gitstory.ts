@@ -2,7 +2,7 @@
 import { writeFileSync } from "node:fs";
 import { $ } from "bun";
 import { GIT_LOG_FORMAT } from "../src/parser.js";
-import { buildSvg } from "../src/cli.js";
+import { buildSvg, buildGif } from "../src/cli.js";
 
 const args = process.argv.slice(2);
 const outputIdx = args.indexOf("--output");
@@ -10,6 +10,8 @@ const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : undefined;
 
 const repoNameIdx = args.indexOf("--repo-name");
 const repoName = repoNameIdx !== -1 ? args[repoNameIdx + 1] : undefined;
+
+const gifMode = args.includes("--gif");
 
 let logInput: string;
 
@@ -26,10 +28,15 @@ if (!process.stdin.isTTY) {
   logInput = result.stdout.toString("utf8");
 }
 
-const svg = buildSvg(logInput, repoName);
-
-if (outputFile) {
-  writeFileSync(outputFile, svg, "utf8");
+if (gifMode) {
+  const gif = buildGif(logInput);
+  const dest = outputFile ?? "timeline.gif";
+  writeFileSync(dest, gif);
 } else {
-  process.stdout.write(svg + "\n");
+  const svg = buildSvg(logInput, repoName);
+  if (outputFile) {
+    writeFileSync(outputFile, svg, "utf8");
+  } else {
+    process.stdout.write(svg + "\n");
+  }
 }
