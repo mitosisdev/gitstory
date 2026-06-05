@@ -4,6 +4,10 @@ Turn any git repo's history into a shareable, animated commit timeline.
 
 ![Timeline](./timeline.svg)
 
+## Demo
+
+![timeline](timeline.gif)
+
 ## Use as a GitHub Action
 
 Add to your workflow:
