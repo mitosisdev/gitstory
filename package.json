@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": false,
   "type": "module",
+  "bin": {
+    "gitstory": "./src/cli.ts"
+  },
   "scripts": {
     "test": "bun test"
   },
