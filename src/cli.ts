@@ -2,6 +2,7 @@ import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
+import { totalCommits, commitsByAuthor } from "./stats.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
 
@@ -23,6 +24,7 @@ if (import.meta.main) {
   let format: "svg" | "gif" = "svg";
   let output: string | null = null;
   let htmlOutput: string | null = null;
+  let showStats = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -45,6 +47,8 @@ if (import.meta.main) {
         console.error("error: --html requires a file path");
         process.exit(1);
       }
+    } else if (arg === "--stats") {
+      showStats = true;
     } else if (!arg.startsWith("--")) {
       repoPath = arg;
     } else {
@@ -75,7 +79,8 @@ if (import.meta.main) {
   }
 
   const logInput = result.stdout ?? "";
-  const commitCount = parseGitLog(logInput).length;
+  const commits = parseGitLog(logInput);
+  const commitCount = totalCommits(commits);
 
   if (htmlOutput) {
     // HTML export: generate SVG and wrap it in a self-contained HTML page
@@ -93,5 +98,15 @@ if (import.meta.main) {
       await Bun.write(outFile, gif);
     }
     console.log(`wrote ${outFile} (${commitCount} commits)`);
+  }
+
+  if (showStats) {
+    const byAuthor = commitsByAuthor(commits);
+    const contributorCount = byAuthor.length;
+    const top = byAuthor[0];
+    const topStr = top ? `${top.author} (${top.count} commits)` : "none";
+    process.stderr.write(
+      `${commitCount} commits · ${contributorCount} contributor${contributorCount !== 1 ? "s" : ""} · top: ${topStr}\n`
+    );
   }
 }

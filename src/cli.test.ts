@@ -155,4 +155,20 @@ describe("CLI entrypoint", () => {
       if (existsSync(outFile)) unlinkSync(outFile);
     }
   });
+
+  it("--stats prints commit count, contributor count, and top contributor to stderr", () => {
+    const outFile = "/tmp/test-timeline-stats.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--stats", "--output", outFile]);
+      expect(result.status).toBe(0);
+      // stats summary goes to stderr
+      const summary = result.stderr as string;
+      expect(summary).toMatch(/\d+ commits/);
+      expect(summary).toMatch(/\d+ contributor/);
+      expect(summary).toMatch(/top:/);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
 });
