@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildSvg } from "./cli.js";
+import { buildSvg, buildGitLogArgs } from "./cli.js";
 import { GIT_LOG_FORMAT } from "./parser.js";
 import { existsSync, unlinkSync, readFileSync } from "fs";
 import { spawnSync } from "child_process";
@@ -50,6 +50,27 @@ describe("buildSvg", () => {
   });
 });
 
+describe("buildGitLogArgs", () => {
+  it("builds base args with no author filter", () => {
+    const args = buildGitLogArgs(null);
+    expect(args[0]).toBe("log");
+    expect(args).toContain(`--format=${GIT_LOG_FORMAT}`);
+    expect(args).not.toContain("--author");
+  });
+
+  it("includes --author and the name when an author filter is given", () => {
+    const args = buildGitLogArgs("Alice");
+    expect(args).toContain("--author");
+    const idx = args.indexOf("--author");
+    expect(args[idx + 1]).toBe("Alice");
+  });
+
+  it("preserves the log format string when filtering by author", () => {
+    const args = buildGitLogArgs("Alice");
+    expect(args).toContain(`--format=${GIT_LOG_FORMAT}`);
+  });
+});
+
 // Resolve the repo root (one level up from src/)
 const REPO_ROOT = resolve(import.meta.dir, "..");
 
@@ -68,8 +89,6 @@ describe("CLI entrypoint", () => {
       const result = runCli([".", "--output", outFile]);
       expect(result.status).toBe(0);
       expect(existsSync(outFile)).toBe(true);
-      const content = Bun.file(outFile).toString();
-      // wait for file read — sync check is enough since we confirmed it exists
     } finally {
       if (existsSync(outFile)) unlinkSync(outFile);
     }
@@ -149,7 +168,6 @@ describe("CLI entrypoint", () => {
       const result = runCli([".", "--html", outFile]);
       expect(result.status).toBe(0);
       const text = readFileSync(outFile, "utf8");
-      // The repo name (basename of cwd — "worker-gitstory-html") should appear in the title tag
       expect(text).toMatch(/<title>[^<]+<\/title>/);
     } finally {
       if (existsSync(outFile)) unlinkSync(outFile);
@@ -162,7 +180,6 @@ describe("CLI entrypoint", () => {
       if (existsSync(outFile)) unlinkSync(outFile);
       const result = runCli([".", "--stats", "--output", outFile]);
       expect(result.status).toBe(0);
-      // stats summary goes to stderr
       const summary = result.stderr as string;
       expect(summary).toMatch(/\d+ commits/);
       expect(summary).toMatch(/\d+ contributor/);
@@ -170,5 +187,24 @@ describe("CLI entrypoint", () => {
     } finally {
       if (existsSync(outFile)) unlinkSync(outFile);
     }
+  });
+
+  it("--author is accepted without an unknown-flag error", () => {
+    const outFile = "/tmp/test-timeline-author.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--author", "Alice", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect((result.stderr as string)).not.toContain("unknown flag");
+      expect(existsSync(outFile)).toBe(true);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--author with no value exits non-zero", () => {
+    const result = runCli([".", "--author"]);
+    expect(result.status).not.toBe(0);
+    expect((result.stderr as string)).toContain("--author requires a name");
   });
 });

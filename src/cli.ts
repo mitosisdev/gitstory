@@ -16,6 +16,17 @@ export function buildGif(logInput: string): Buffer {
   return renderGif(commits);
 }
 
+/**
+ * Build the argument list for `git log`. When an author filter is provided,
+ * git's built-in `--author` flag is appended (substring matching against
+ * commit author name and email).
+ */
+export function buildGitLogArgs(authorFilter: string | null): string[] {
+  const gitArgs = ["log", `--format=${GIT_LOG_FORMAT}`];
+  if (authorFilter) gitArgs.push("--author", authorFilter);
+  return gitArgs;
+}
+
 if (import.meta.main) {
   const args = process.argv.slice(2);
 
@@ -25,6 +36,7 @@ if (import.meta.main) {
   let output: string | null = null;
   let htmlOutput: string | null = null;
   let showStats = false;
+  let authorFilter: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -47,6 +59,12 @@ if (import.meta.main) {
         console.error("error: --html requires a file path");
         process.exit(1);
       }
+    } else if (arg === "--author") {
+      authorFilter = args[++i] ?? null;
+      if (!authorFilter) {
+        console.error("error: --author requires a name");
+        process.exit(1);
+      }
     } else if (arg === "--stats") {
       showStats = true;
     } else if (!arg.startsWith("--")) {
@@ -63,7 +81,7 @@ if (import.meta.main) {
   // Run git log
   const result = spawnSync(
     "git",
-    ["log", `--format=${GIT_LOG_FORMAT}`],
+    buildGitLogArgs(authorFilter),
     { cwd: absRepoPath, encoding: "utf8" }
   );
 
