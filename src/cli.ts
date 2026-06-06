@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";

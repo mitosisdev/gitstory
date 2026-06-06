@@ -1,8 +1,12 @@
 {
   "name": "gitstory",
   "version": "0.0.1",
+  "description": "Turn any git repo's history into a shareable SVG commit timeline",
   "private": false,
   "type": "module",
+  "files": [
+    "src/"
+  ],
   "bin": {
     "gitstory": "./src/cli.ts"
   },
