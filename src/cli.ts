@@ -1,6 +1,7 @@
 import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
+import { wrapSvgInHtml } from "./html.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
 
@@ -21,6 +22,7 @@ if (import.meta.main) {
   let repoPath = ".";
   let format: "svg" | "gif" = "svg";
   let output: string | null = null;
+  let htmlOutput: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -37,6 +39,12 @@ if (import.meta.main) {
         console.error("error: --output requires a file path");
         process.exit(1);
       }
+    } else if (arg === "--html") {
+      htmlOutput = args[++i] ?? null;
+      if (!htmlOutput) {
+        console.error("error: --html requires a file path");
+        process.exit(1);
+      }
     } else if (!arg.startsWith("--")) {
       repoPath = arg;
     } else {
@@ -47,7 +55,6 @@ if (import.meta.main) {
 
   const absRepoPath = resolve(repoPath);
   const repoName = basename(absRepoPath);
-  const outFile = output ?? `timeline.${format}`;
 
   // Run git log
   const result = spawnSync(
@@ -70,13 +77,21 @@ if (import.meta.main) {
   const logInput = result.stdout ?? "";
   const commitCount = parseGitLog(logInput).length;
 
-  if (format === "svg") {
+  if (htmlOutput) {
+    // HTML export: generate SVG and wrap it in a self-contained HTML page
     const svg = buildSvg(logInput, repoName);
-    await Bun.write(outFile, svg);
+    const html = wrapSvgInHtml(svg, repoName);
+    await Bun.write(htmlOutput, html);
+    console.log(`wrote ${htmlOutput} (${commitCount} commits)`);
   } else {
-    const gif = buildGif(logInput);
-    await Bun.write(outFile, gif);
+    const outFile = output ?? `timeline.${format}`;
+    if (format === "svg") {
+      const svg = buildSvg(logInput, repoName);
+      await Bun.write(outFile, svg);
+    } else {
+      const gif = buildGif(logInput);
+      await Bun.write(outFile, gif);
+    }
+    console.log(`wrote ${outFile} (${commitCount} commits)`);
   }
-
-  console.log(`wrote ${outFile} (${commitCount} commits)`);
 }

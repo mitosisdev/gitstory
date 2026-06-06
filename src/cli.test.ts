@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { buildSvg } from "./cli.js";
 import { GIT_LOG_FORMAT } from "./parser.js";
-import { existsSync, unlinkSync } from "fs";
+import { existsSync, unlinkSync, readFileSync } from "fs";
 import { spawnSync } from "child_process";
 import { resolve } from "path";
 
@@ -102,5 +102,57 @@ describe("CLI entrypoint", () => {
   it("exits non-zero for an invalid repo path", () => {
     const result = runCli(["/nonexistent/path/that/does/not/exist"]);
     expect(result.status).not.toBe(0);
+  });
+
+  it("--html writes an HTML file to the specified path", () => {
+    const outFile = "/tmp/test-timeline-gitstory.html";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--html", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--html output contains <!DOCTYPE html>", () => {
+    const outFile = "/tmp/test-timeline-gitstory-doctype.html";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--html", outFile]);
+      expect(result.status).toBe(0);
+      const text = readFileSync(outFile, "utf8");
+      expect(text).toContain("<!DOCTYPE html>");
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--html output contains SVG content", () => {
+    const outFile = "/tmp/test-timeline-gitstory-svg.html";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--html", outFile]);
+      expect(result.status).toBe(0);
+      const text = readFileSync(outFile, "utf8");
+      expect(text).toContain("<svg");
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--html output contains the repo name as title", () => {
+    const outFile = "/tmp/test-timeline-gitstory-title.html";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--html", outFile]);
+      expect(result.status).toBe(0);
+      const text = readFileSync(outFile, "utf8");
+      // The repo name (basename of cwd — "worker-gitstory-html") should appear in the title tag
+      expect(text).toMatch(/<title>[^<]+<\/title>/);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
   });
 });
