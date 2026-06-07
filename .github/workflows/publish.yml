@@ -1,0 +1,25 @@
+# Publishes gitstory to npm when a version tag (v*) is pushed.
+# Prerequisites: set NPM_TOKEN in the repo secrets (Settings → Secrets → Actions).
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile || bun install
+
+      # Fail fast: don't publish if tests are broken
+      - run: bun test
+
+      - run: bun publish --no-git-checks
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
