@@ -37,6 +37,7 @@ if (import.meta.main) {
   let htmlOutput: string | null = null;
   let showStats = false;
   let sinceFilter: SinceFilter | undefined;
+  let branchFilter: string | null = null;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -68,6 +69,13 @@ if (import.meta.main) {
         process.exit(1);
       }
       sinceFilter = parseSince(val);
+    } else if (arg === "--branch") {
+      const val = args[++i] ?? null;
+      if (!val) {
+        console.error("error: --branch requires a branch name");
+        process.exit(1);
+      }
+      branchFilter = val;
     } else if (!arg.startsWith("--")) {
       repoPath = arg;
     } else {
@@ -79,10 +87,27 @@ if (import.meta.main) {
   const absRepoPath = resolve(repoPath);
   const repoName = basename(absRepoPath);
 
+  // Validate --branch if provided: check the branch actually exists
+  if (branchFilter !== null) {
+    const checkResult = spawnSync(
+      "git",
+      ["rev-parse", "--verify", `refs/heads/${branchFilter}`],
+      { cwd: absRepoPath, encoding: "utf8" },
+    );
+    if (checkResult.status !== 0) {
+      console.error(`error: branch "${branchFilter}" does not exist in "${absRepoPath}"`);
+      process.exit(1);
+    }
+  }
+
   // Build git log args — ref-type since is handled as a revision range
   const gitLogArgs = ["log", `--format=${GIT_LOG_FORMAT}`];
   if (sinceFilter?.type === "ref") {
     gitLogArgs.push(`${sinceFilter.value}..HEAD`);
+  }
+  // When --branch is provided, scope the log to that branch
+  if (branchFilter !== null) {
+    gitLogArgs.push(branchFilter);
   }
 
   // Run git log
