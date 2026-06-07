@@ -17,6 +17,59 @@ export function buildGif(logInput: string): Buffer {
   return renderGif(commits);
 }
 
+export type SinceParsed =
+  | { type: "count"; value: number }
+  | { type: "days"; value: number }
+  | { type: "ref"; value: string };
+
+/**
+ * Parse the --since argument value into a typed descriptor.
+ *
+ * Rules:
+ *   "50"     → { type: "count", value: 50 }   (pure integer string)
+ *   "90d"    → { type: "days",  value: 90 }   (integer followed by 'd')
+ *   "v1.0.0" → { type: "ref",   value: "v1.0.0" } (any other string)
+ */
+export function parseSince(raw: string | undefined): SinceParsed | undefined {
+  if (raw === undefined) return undefined;
+
+  // Pure integer → count limit
+  if (/^\d+$/.test(raw)) {
+    return { type: "count", value: parseInt(raw, 10) };
+  }
+
+  // Integer followed by 'd' → day range
+  const daysMatch = raw.match(/^(\d+)d$/);
+  if (daysMatch) {
+    return { type: "days", value: parseInt(daysMatch[1], 10) };
+  }
+
+  // Anything else → treat as a git ref
+  return { type: "ref", value: raw };
+}
+
+/**
+ * Build the git log argument array for spawnSync, incorporating --since filtering.
+ */
+export function buildGitLogArgs(since: SinceParsed | undefined): string[] {
+  const formatArg = `--format=${GIT_LOG_FORMAT}`;
+
+  if (since === undefined) {
+    return ["log", formatArg];
+  }
+
+  if (since.type === "count") {
+    return ["log", `-${since.value}`, formatArg];
+  }
+
+  if (since.type === "days") {
+    return ["log", `--since=${since.value}.days.ago`, formatArg];
+  }
+
+  // ref: use <ref>..HEAD range
+  return ["log", `${since.value}..HEAD`, formatArg];
+}
+
 if (import.meta.main) {
   const args = process.argv.slice(2);
 
@@ -26,6 +79,7 @@ if (import.meta.main) {
   let output: string | null = null;
   let htmlOutput: string | null = null;
   let showStats = false;
+  let sinceRaw: string | undefined = undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -50,6 +104,12 @@ if (import.meta.main) {
       }
     } else if (arg === "--stats") {
       showStats = true;
+    } else if (arg === "--since") {
+      sinceRaw = args[++i];
+      if (!sinceRaw) {
+        console.error("error: --since requires a value (count, days like 90d, or a git ref)");
+        process.exit(1);
+      }
     } else if (!arg.startsWith("--")) {
       repoPath = arg;
     } else {
@@ -60,11 +120,12 @@ if (import.meta.main) {
 
   const absRepoPath = resolve(repoPath);
   const repoName = basename(absRepoPath);
+  const since = parseSince(sinceRaw);
 
   // Run git log
   const result = spawnSync(
     "git",
-    ["log", `--format=${GIT_LOG_FORMAT}`],
+    buildGitLogArgs(since),
     { cwd: absRepoPath, encoding: "utf8" }
   );
 

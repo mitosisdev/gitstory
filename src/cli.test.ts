@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildSvg } from "./cli.js";
+import { buildSvg, parseSince, buildGitLogArgs } from "./cli.js";
 import { GIT_LOG_FORMAT } from "./parser.js";
 import { existsSync, unlinkSync, readFileSync } from "fs";
 import { spawnSync } from "child_process";
@@ -47,6 +47,67 @@ describe("buildSvg", () => {
     expect(GIT_LOG_FORMAT).toContain("%an");
     expect(GIT_LOG_FORMAT).toContain("%aI");
     expect(GIT_LOG_FORMAT).toContain("%s");
+  });
+});
+
+describe("parseSince", () => {
+  it("returns undefined when since is undefined", () => {
+    expect(parseSince(undefined)).toBeUndefined();
+  });
+
+  it("parses a numeric string as count", () => {
+    const result = parseSince("50");
+    expect(result).toEqual({ type: "count", value: 50 });
+  });
+
+  it("parses a days string like '90d' as days", () => {
+    const result = parseSince("90d");
+    expect(result).toEqual({ type: "days", value: 90 });
+  });
+
+  it("parses a single-digit day string like '7d' as days", () => {
+    const result = parseSince("7d");
+    expect(result).toEqual({ type: "days", value: 7 });
+  });
+
+  it("parses a git ref/tag like 'v1.0.0' as ref", () => {
+    const result = parseSince("v1.0.0");
+    expect(result).toEqual({ type: "ref", value: "v1.0.0" });
+  });
+
+  it("parses a branch name as ref", () => {
+    const result = parseSince("main");
+    expect(result).toEqual({ type: "ref", value: "main" });
+  });
+});
+
+describe("buildGitLogArgs", () => {
+  const FORMAT_ARG = `--format=${GIT_LOG_FORMAT}`;
+
+  it("returns base args when since is undefined", () => {
+    const args = buildGitLogArgs(undefined);
+    expect(args).toEqual(["log", FORMAT_ARG]);
+  });
+
+  it("adds -N for count since", () => {
+    const args = buildGitLogArgs({ type: "count", value: 50 });
+    expect(args).toContain("-50");
+    expect(args).toContain("log");
+    expect(args).toContain(FORMAT_ARG);
+  });
+
+  it("adds --since=N.days.ago for days since", () => {
+    const args = buildGitLogArgs({ type: "days", value: 90 });
+    expect(args).toContain("--since=90.days.ago");
+    expect(args).toContain("log");
+    expect(args).toContain(FORMAT_ARG);
+  });
+
+  it("adds ref..HEAD range for ref since", () => {
+    const args = buildGitLogArgs({ type: "ref", value: "v1.0.0" });
+    expect(args).toContain("v1.0.0..HEAD");
+    expect(args).toContain("log");
+    expect(args).toContain(FORMAT_ARG);
   });
 });
 
@@ -167,6 +228,42 @@ describe("CLI entrypoint", () => {
       expect(summary).toMatch(/\d+ commits/);
       expect(summary).toMatch(/\d+ contributor/);
       expect(summary).toMatch(/top:/);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since 50 exits zero and produces output", () => {
+    const outFile = "/tmp/test-timeline-since-count.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", "50", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since 90d exits zero and produces output", () => {
+    const outFile = "/tmp/test-timeline-since-days.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", "90d", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since main exits zero and produces output", () => {
+    const outFile = "/tmp/test-timeline-since-ref.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", "main", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
     } finally {
       if (existsSync(outFile)) unlinkSync(outFile);
     }
