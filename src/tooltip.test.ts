@@ -28,16 +28,21 @@ describe("HTML tooltip — data attributes on circles", () => {
     expect(svg).toContain('data-date="2026-01-10T10:00:00Z"');
   });
 
-  it("circle elements have data-msg attribute with commit subject", () => {
+  it("circle elements have data-message attribute with commit subject", () => {
     const svg = renderTimeline([C1]);
-    expect(svg).toContain('data-msg="feat: add tooltip feature"');
+    expect(svg).toContain('data-message="feat: add tooltip feature"');
   });
 
-  it("data-msg escapes XML special characters", () => {
+  it("data-message escapes XML special characters", () => {
     const bad = makeCommit("bad1", 'feat: <script>alert("xss")</script>', "2026-01-01T00:00:00Z");
     const svg = renderTimeline([bad]);
     expect(svg).not.toContain("<script>");
     expect(svg).toContain("&lt;script&gt;");
+  });
+
+  it("circle elements do NOT use legacy data-msg attribute", () => {
+    const svg = renderTimeline([C1]);
+    expect(svg).not.toContain("data-msg=");
   });
 });
 
@@ -91,10 +96,10 @@ describe("HTML tooltip — wrapSvgInHtml injects script and style", () => {
     expect(html).toContain("data-sha");
   });
 
-  it("script block reads data-msg from the hovered circle", () => {
+  it("script block reads data-message from the hovered circle", () => {
     const svg = renderTimeline([C1]);
     const html = wrapSvgInHtml(svg, "test-repo");
-    expect(html).toContain("data-msg");
+    expect(html).toContain("data-message");
   });
 
   it("script block reads data-author from the hovered circle", () => {
@@ -107,6 +112,33 @@ describe("HTML tooltip — wrapSvgInHtml injects script and style", () => {
     const svg = renderTimeline([C1]);
     const html = wrapSvgInHtml(svg, "test-repo");
     expect(html).toContain("data-date");
+  });
+
+  it("script does NOT reference legacy data-msg attribute", () => {
+    const svg = renderTimeline([C1]);
+    const html = wrapSvgInHtml(svg, "test-repo");
+    // The JS should read data-message, not the old data-msg
+    expect(html).not.toContain("data-msg");
+  });
+
+  it("script block clamps tooltip position to avoid right-edge overflow", () => {
+    const svg = renderTimeline([C1]);
+    const html = wrapSvgInHtml(svg, "test-repo");
+    // Viewport-aware positioning should use window.innerWidth
+    expect(html).toContain("innerWidth");
+  });
+
+  it("script block clamps tooltip position to avoid bottom-edge overflow", () => {
+    const svg = renderTimeline([C1]);
+    const html = wrapSvgInHtml(svg, "test-repo");
+    // Viewport-aware positioning should use window.innerHeight
+    expect(html).toContain("innerHeight");
+  });
+
+  it("tooltip div has id gs-tooltip", () => {
+    const svg = renderTimeline([C1]);
+    const html = wrapSvgInHtml(svg, "test-repo");
+    expect(html).toContain('id="gs-tooltip"');
   });
 });
 

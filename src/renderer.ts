@@ -87,7 +87,7 @@ export function renderTimeline(commits: Commit[], repoName?: string): string {
         ? c.subject.slice(0, MAX_LABEL_CHARS) + "…"
         : c.subject;
     return [
-      `  <circle cx="${x}" cy="${timelineY}" r="${DOT_R}" fill="${DOT_COLOR}" data-sha="${escapeXml(c.sha)}" data-author="${escapeXml(c.authorName)}" data-date="${escapeXml(c.isoTimestamp)}" data-msg="${escapeXml(c.subject)}">`,
+      `  <circle cx="${x}" cy="${timelineY}" r="${DOT_R}" fill="${DOT_COLOR}" data-sha="${escapeXml(c.sha)}" data-author="${escapeXml(c.authorName)}" data-date="${escapeXml(c.isoTimestamp)}" data-message="${escapeXml(c.subject)}">`,
       `    <title>${escapeXml(c.subject)}</title>`,
       `  </circle>`,
       `  <text x="${x}" y="${timelineY + 18}" font-size="10" text-anchor="middle" fill="${LABEL_COLOR}">${escapeXml(label)}</text>`,
