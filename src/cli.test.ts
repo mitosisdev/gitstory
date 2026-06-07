@@ -172,3 +172,55 @@ describe("CLI entrypoint", () => {
     }
   });
 });
+
+describe("CLI --since flag", () => {
+  it("--since 1 limits output to 1 commit (count form)", () => {
+    const outFile = "/tmp/test-timeline-since-count.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", "1", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+      const text = readFileSync(outFile, "utf8");
+      expect(text).toContain("<svg");
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since 9999d includes all commits (days form — large window)", () => {
+    const outFile = "/tmp/test-timeline-since-days.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", "9999d", "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+      const text = readFileSync(outFile, "utf8");
+      expect(text).toContain("<svg");
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since with a valid ref produces an SVG (ref form)", () => {
+    const firstSha = spawnSync("git", ["rev-list", "--max-parents=0", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const outFile = "/tmp/test-timeline-since-ref.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--since", firstSha, "--output", outFile]);
+      expect(result.status).toBe(0);
+      expect(existsSync(outFile)).toBe(true);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--since missing value exits non-zero", () => {
+    const result = runCli([".", "--since"]);
+    expect(result.status).not.toBe(0);
+  });
+});
