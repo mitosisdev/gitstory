@@ -41,10 +41,10 @@ export function wrapSvgInHtml(svg: string, title: string): string {
   circles.forEach(function (circle) {
     circle.style.cursor = 'pointer';
     circle.addEventListener('mouseenter', function (e) {
-      var msg    = circle.getAttribute('data-msg')    || '';
-      var author = circle.getAttribute('data-author') || '';
-      var date   = circle.getAttribute('data-date')   || '';
-      var sha    = circle.getAttribute('data-sha')    || '';
+      var msg    = circle.getAttribute('data-message') || '';
+      var author = circle.getAttribute('data-author')  || '';
+      var date   = circle.getAttribute('data-date')    || '';
+      var sha    = circle.getAttribute('data-sha')     || '';
       tip.innerHTML =
         '<strong>' + escTip(msg) + '</strong><br>' +
         escTip(author) + '<br>' +
@@ -60,8 +60,13 @@ export function wrapSvgInHtml(svg: string, title: string): string {
     });
   });
   function positionTip(e) {
-    var x = e.clientX + 14;
-    var y = e.clientY + 14;
+    var pad = 14;
+    var tw  = tip.offsetWidth  || 320;
+    var th  = tip.offsetHeight || 60;
+    var x = e.clientX + pad;
+    var y = e.clientY + pad;
+    if (x + tw > window.innerWidth  - pad) { x = e.clientX - tw - pad; }
+    if (y + th > window.innerHeight - pad) { y = e.clientY - th - pad; }
     tip.style.left = x + 'px';
     tip.style.top  = y + 'px';
   }
