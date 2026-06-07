@@ -4,6 +4,7 @@ import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
 import { totalCommits, commitsByAuthor } from "./stats.js";
+import { parseSince, applySince, type SinceFilter } from "./since.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
 
@@ -17,6 +18,15 @@ export function buildGif(logInput: string): Buffer {
   return renderGif(commits);
 }
 
+// Internal helpers that accept pre-parsed (and already-filtered) commits.
+export function buildSvgFromCommits(commits: import("./parser.js").Commit[], repoName?: string): string {
+  return renderTimeline(commits, repoName);
+}
+
+export function buildGifFromCommits(commits: import("./parser.js").Commit[]): Buffer {
+  return renderGif(commits);
+}
+
 if (import.meta.main) {
   const args = process.argv.slice(2);
 
@@ -26,6 +36,7 @@ if (import.meta.main) {
   let output: string | null = null;
   let htmlOutput: string | null = null;
   let showStats = false;
+  let sinceFilter: SinceFilter | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -36,10 +47,10 @@ if (import.meta.main) {
         process.exit(1);
       }
       format = val;
-    } else if (arg === "--output") {
+    } else if (arg === "--output" || arg === "--out") {
       output = args[++i] ?? null;
       if (!output) {
-        console.error("error: --output requires a file path");
+        console.error(`error: ${arg} requires a file path`);
         process.exit(1);
       }
     } else if (arg === "--html") {
@@ -50,6 +61,13 @@ if (import.meta.main) {
       }
     } else if (arg === "--stats") {
       showStats = true;
+    } else if (arg === "--since") {
+      const val = args[++i] ?? null;
+      if (!val) {
+        console.error("error: --since requires a value (e.g. 50, 90d, or v1.0.0)");
+        process.exit(1);
+      }
+      sinceFilter = parseSince(val);
     } else if (!arg.startsWith("--")) {
       repoPath = arg;
     } else {
@@ -61,12 +79,14 @@ if (import.meta.main) {
   const absRepoPath = resolve(repoPath);
   const repoName = basename(absRepoPath);
 
+  // Build git log args — ref-type since is handled as a revision range
+  const gitLogArgs = ["log", `--format=${GIT_LOG_FORMAT}`];
+  if (sinceFilter?.type === "ref") {
+    gitLogArgs.push(`${sinceFilter.value}..HEAD`);
+  }
+
   // Run git log
-  const result = spawnSync(
-    "git",
-    ["log", `--format=${GIT_LOG_FORMAT}`],
-    { cwd: absRepoPath, encoding: "utf8" }
-  );
+  const result = spawnSync("git", gitLogArgs, { cwd: absRepoPath, encoding: "utf8" });
 
   if (result.error) {
     console.error(`error: failed to run git: ${result.error.message}`);
@@ -80,22 +100,24 @@ if (import.meta.main) {
   }
 
   const logInput = result.stdout ?? "";
-  const commits = parseGitLog(logInput);
+  // For count/days filters, apply post-parse; ref was already handled by git log
+  const allCommits = parseGitLog(logInput);
+  const commits = applySince(allCommits, sinceFilter);
   const commitCount = totalCommits(commits);
 
   if (htmlOutput) {
     // HTML export: generate SVG and wrap it in a self-contained HTML page
-    const svg = buildSvg(logInput, repoName);
+    const svg = buildSvgFromCommits(commits, repoName);
     const html = wrapSvgInHtml(svg, repoName);
     await Bun.write(htmlOutput, html);
     console.log(`wrote ${htmlOutput} (${commitCount} commits)`);
   } else {
     const outFile = output ?? `timeline.${format}`;
     if (format === "svg") {
-      const svg = buildSvg(logInput, repoName);
+      const svg = buildSvgFromCommits(commits, repoName);
       await Bun.write(outFile, svg);
     } else {
-      const gif = buildGif(logInput);
+      const gif = buildGifFromCommits(commits);
       await Bun.write(outFile, gif);
     }
     console.log(`wrote ${outFile} (${commitCount} commits)`);
