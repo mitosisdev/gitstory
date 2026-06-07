@@ -154,12 +154,13 @@ describe("renderTimeline", () => {
       { sha: "a2", authorName: "Alice", authorEmail: "alice@x.com", isoTimestamp: "2026-01-03T00:00:00Z", subject: "feat: three" },
     ];
     const svg = renderTimeline(commits);
-    const alicePos = svg.indexOf("Alice");
-    const bobPos = svg.indexOf("Bob");
-    expect(alicePos).toBeGreaterThan(-1);
-    expect(bobPos).toBeGreaterThan(-1);
-    // Alice (2 commits) appears before Bob (1 commit)
-    expect(alicePos).toBeLessThan(bobPos);
+    // Search for legend entries specifically ("Name — N commits" format)
+    const aliceLegendPos = svg.indexOf("Alice —");
+    const bobLegendPos = svg.indexOf("Bob —");
+    expect(aliceLegendPos).toBeGreaterThan(-1);
+    expect(bobLegendPos).toBeGreaterThan(-1);
+    // Alice (2 commits) appears before Bob (1 commit) in the legend
+    expect(aliceLegendPos).toBeLessThan(bobLegendPos);
   });
 
   it("limits legend to top 5 authors", () => {
@@ -176,10 +177,11 @@ describe("renderTimeline", () => {
     );
     const svg = renderTimeline(commits);
     // Frank is the 6th author (fewest commits) and should NOT appear in the legend
-    expect(svg).not.toContain("Frank");
+    // Check legend entries specifically ("Name — N commits" format)
+    expect(svg).not.toContain("Frank —");
     // Alice through Eve (top 5) should appear in the legend
-    expect(svg).toContain("Alice");
-    expect(svg).toContain("Eve");
+    expect(svg).toContain("Alice —");
+    expect(svg).toContain("Eve —");
   });
 
   it("does not render legend for empty commits", () => {
