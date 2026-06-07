@@ -1,4 +1,5 @@
 import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
+import type { Commit } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
@@ -6,13 +7,26 @@ import { totalCommits, commitsByAuthor } from "./stats.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
 
-export function buildSvg(logInput: string, repoName?: string): string {
-  const commits = parseGitLog(logInput);
+/**
+ * Filter a parsed commit list to only those whose author name contains the
+ * given string (case-insensitive substring match). Pass null or empty string
+ * to skip filtering and return all commits unchanged.
+ */
+export function filterCommitsByAuthor(commits: Commit[], filter: string | null): Commit[] {
+  if (!filter) return commits;
+  const needle = filter.toLowerCase();
+  return commits.filter((c) => c.authorName.toLowerCase().includes(needle));
+}
+
+export function buildSvg(logInput: string, repoName?: string, authorFilter?: string | null): string {
+  let commits = parseGitLog(logInput);
+  if (authorFilter != null) commits = filterCommitsByAuthor(commits, authorFilter);
   return renderTimeline(commits, repoName);
 }
 
-export function buildGif(logInput: string): Buffer {
-  const commits = parseGitLog(logInput);
+export function buildGif(logInput: string, authorFilter?: string | null): Buffer {
+  let commits = parseGitLog(logInput);
+  if (authorFilter != null) commits = filterCommitsByAuthor(commits, authorFilter);
   return renderGif(commits);
 }
 
@@ -102,17 +116,17 @@ if (import.meta.main) {
 
   if (htmlOutput) {
     // HTML export: generate SVG and wrap it in a self-contained HTML page
-    const svg = buildSvg(logInput, repoName);
+    const svg = buildSvg(logInput, repoName, authorFilter);
     const html = wrapSvgInHtml(svg, repoName);
     await Bun.write(htmlOutput, html);
     console.log(`wrote ${htmlOutput} (${commitCount} commits)`);
   } else {
     const outFile = output ?? `timeline.${format}`;
     if (format === "svg") {
-      const svg = buildSvg(logInput, repoName);
+      const svg = buildSvg(logInput, repoName, authorFilter);
       await Bun.write(outFile, svg);
     } else {
-      const gif = buildGif(logInput);
+      const gif = buildGif(logInput, authorFilter);
       await Bun.write(outFile, gif);
     }
     console.log(`wrote ${outFile} (${commitCount} commits)`);

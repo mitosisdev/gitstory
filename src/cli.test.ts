@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { buildSvg, buildGitLogArgs } from "./cli.js";
+import { buildSvg, buildGitLogArgs, filterCommitsByAuthor } from "./cli.js";
+import type { Commit } from "./parser.js";
 import { GIT_LOG_FORMAT } from "./parser.js";
 import { existsSync, unlinkSync, readFileSync } from "fs";
 import { spawnSync } from "child_process";
@@ -206,5 +207,103 @@ describe("CLI entrypoint", () => {
     const result = runCli([".", "--author"]);
     expect(result.status).not.toBe(0);
     expect((result.stderr as string)).toContain("--author requires a name");
+  });
+});
+
+// ── filterCommitsByAuthor ──────────────────────────────────────────────────
+
+function makeCommitFull(sha: string, authorName: string, subject = "feat: x"): Commit {
+  return {
+    sha,
+    authorName,
+    authorEmail: "test@example.com",
+    isoTimestamp: "2026-01-01T00:00:00Z",
+    subject,
+  };
+}
+
+const MIXED_AUTHORS: Commit[] = [
+  makeCommitFull("a1", "Alice Smith", "feat: one"),
+  makeCommitFull("b1", "Bob Jones", "feat: two"),
+  makeCommitFull("a2", "alice cooper", "feat: three"),
+  makeCommitFull("c1", "Charlie", "feat: four"),
+];
+
+describe("filterCommitsByAuthor", () => {
+  it("null filter returns all commits unchanged", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, null);
+    expect(result).toHaveLength(4);
+  });
+
+  it("exact case match filters to matching commits", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "Alice Smith");
+    expect(result).toHaveLength(1);
+    expect(result[0].authorName).toBe("Alice Smith");
+  });
+
+  it("case-insensitive: lowercase 'alice' matches 'Alice Smith' and 'alice cooper'", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "alice");
+    expect(result).toHaveLength(2);
+    const names = result.map((c) => c.authorName);
+    expect(names).toContain("Alice Smith");
+    expect(names).toContain("alice cooper");
+  });
+
+  it("case-insensitive: uppercase 'ALICE' also matches both alice variants", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "ALICE");
+    expect(result).toHaveLength(2);
+  });
+
+  it("partial substring match: 'jones' matches 'Bob Jones'", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "jones");
+    expect(result).toHaveLength(1);
+    expect(result[0].authorName).toBe("Bob Jones");
+  });
+
+  it("no match returns empty array, not a crash", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "Zaphod");
+    expect(result).toHaveLength(0);
+  });
+
+  it("empty commits array with a filter returns empty array", () => {
+    const result = filterCommitsByAuthor([], "Alice");
+    expect(result).toHaveLength(0);
+  });
+
+  it("empty string filter returns all commits (treated as null/no-op)", () => {
+    const result = filterCommitsByAuthor(MIXED_AUTHORS, "");
+    expect(result).toHaveLength(4);
+  });
+});
+
+describe("buildSvg with author filter", () => {
+  const SEP = "|";
+  function makeLogLine(sha: string, author: string, subject: string, iso = "2026-01-10T10:00:00Z"): string {
+    return [sha, author, "a@b.com", iso, subject].join(SEP);
+  }
+
+  const MULTI_AUTHOR_LOG = [
+    makeLogLine("aaa", "Alice Smith", "feat: alice one"),
+    makeLogLine("bbb", "Bob Jones", "feat: bob one"),
+    makeLogLine("ccc", "alice cooper", "feat: alice two"),
+  ].join("\n");
+
+  it("no author filter includes all commits", () => {
+    const svg = buildSvg(MULTI_AUTHOR_LOG, "repo", null);
+    const circleCount = (svg.match(/<circle/g) ?? []).length;
+    expect(circleCount).toBe(3);
+  });
+
+  it("author filter 'alice' shows only alice commits (case-insensitive)", () => {
+    const svg = buildSvg(MULTI_AUTHOR_LOG, "repo", "alice");
+    const circleCount = (svg.match(/<circle/g) ?? []).length;
+    expect(circleCount).toBe(2);
+  });
+
+  it("author filter with no match produces SVG with zero commit dots", () => {
+    const svg = buildSvg(MULTI_AUTHOR_LOG, "repo", "Zaphod");
+    expect(svg).toContain("<svg");
+    const circleCount = (svg.match(/<circle/g) ?? []).length;
+    expect(circleCount).toBe(0);
   });
 });
