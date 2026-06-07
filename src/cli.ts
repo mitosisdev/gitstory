@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
+import { parseGitLog, GIT_LOG_FORMAT, type Commit } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
@@ -7,6 +7,41 @@ import { totalCommits, commitsByAuthor } from "./stats.js";
 import { parseSince, applySince, type SinceFilter } from "./since.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
+
+// Conventional commit regex: type(scope)!: message  or  type!: message
+const CONVENTIONAL_RE = /^([a-zA-Z]+)(\([^)]*\))?(!)?\s*:/;
+
+export interface JsonCommit {
+  hash: string;
+  shortHash: string;
+  author: string;
+  email: string;
+  date: string;
+  message: string;
+  type: string | null;
+  scope: string | null;
+  breaking: boolean;
+}
+
+export function commitsToJson(commits: Commit[]): JsonCommit[] {
+  return commits.map((c) => {
+    const match = CONVENTIONAL_RE.exec(c.subject);
+    const type = match ? match[1] ?? null : null;
+    const scope = match && match[2] ? match[2].slice(1, -1) : null; // strip parens
+    const breaking = match ? match[3] === "!" : false;
+    return {
+      hash: c.sha,
+      shortHash: c.sha.slice(0, 7),
+      author: c.authorName,
+      email: c.authorEmail,
+      date: c.isoTimestamp,
+      message: c.subject,
+      type,
+      scope,
+      breaking,
+    };
+  });
+}
 
 export function buildSvg(logInput: string, repoName?: string): string {
   const commits = parseGitLog(logInput);
@@ -36,11 +71,14 @@ if (import.meta.main) {
   let output: string | null = null;
   let htmlOutput: string | null = null;
   let showStats = false;
+  let jsonMode = false;
   let sinceFilter: SinceFilter | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--format") {
+    if (arg === "--json") {
+      jsonMode = true;
+    } else if (arg === "--format") {
       const val = args[++i];
       if (val !== "svg" && val !== "gif") {
         console.error(`error: --format must be svg or gif, got "${val}"`);
@@ -105,7 +143,16 @@ if (import.meta.main) {
   const commits = applySince(allCommits, sinceFilter);
   const commitCount = totalCommits(commits);
 
-  if (htmlOutput) {
+  if (jsonMode) {
+    // JSON export: serialize parsed commits to structured JSON
+    const json = JSON.stringify(commitsToJson(commits), null, 2);
+    if (output) {
+      await Bun.write(output, json);
+      console.log(`wrote ${output} (${commitCount} commits)`);
+    } else {
+      process.stdout.write(json + "\n");
+    }
+  } else if (htmlOutput) {
     // HTML export: generate SVG and wrap it in a self-contained HTML page
     const svg = buildSvgFromCommits(commits, repoName);
     const html = wrapSvgInHtml(svg, repoName);
