@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { writeFileSync } from "node:fs";
 import { $ } from "bun";
-import { GIT_LOG_FORMAT } from "../src/parser.js";
+import { GIT_LOG_FORMAT, parseGitLog } from "../src/parser.js";
 import { buildSvg, buildGif } from "../src/cli.js";
+import { formatStats } from "../src/stats-format.js";
 
 const args = process.argv.slice(2);
 const outputIdx = args.indexOf("--output");
@@ -12,6 +13,7 @@ const repoNameIdx = args.indexOf("--repo-name");
 const repoName = repoNameIdx !== -1 ? args[repoNameIdx + 1] : undefined;
 
 const gifMode = args.includes("--gif");
+const showStats = args.includes("--stats");
 
 let logInput: string;
 
@@ -39,4 +41,16 @@ if (gifMode) {
   } else {
     process.stdout.write(svg + "\n");
   }
+}
+
+// --stats: emit a summary + per-month breakdown table to stderr so it never
+// pollutes the SVG/GIF written to stdout (which is commonly piped to a file).
+if (showStats) {
+  const records = parseGitLog(logInput).map((c) => ({
+    hash: c.sha,
+    author: c.authorName,
+    date: new Date(c.isoTimestamp),
+    message: c.subject,
+  }));
+  process.stderr.write(formatStats(records) + "\n");
 }
