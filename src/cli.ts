@@ -3,7 +3,7 @@ import { parseGitLog, GIT_LOG_FORMAT } from "./parser.js";
 import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
-import { totalCommits, commitsByAuthor } from "./stats.js";
+import { totalCommits, commitsByAuthor, commitsByMonth } from "./stats.js";
 import { parseSince, applySince, type SinceFilter } from "./since.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
@@ -124,12 +124,52 @@ if (import.meta.main) {
   }
 
   if (showStats) {
-    const byAuthor = commitsByAuthor(commits);
+    // Map parser Commit[] → stats CommitRecord[] for stats functions
+    const statsRecords = commits.map((c) => ({
+      hash: c.sha,
+      author: c.authorName,
+      date: new Date(c.isoTimestamp),
+      message: c.subject,
+    }));
+
+    const byAuthor = commitsByAuthor(statsRecords);
     const contributorCount = byAuthor.length;
     const top = byAuthor[0];
     const topStr = top ? `${top.author} (${top.count} commits)` : "none";
     process.stderr.write(
       `${commitCount} commits · ${contributorCount} contributor${contributorCount !== 1 ? "s" : ""} · top: ${topStr}\n`
     );
+
+    // Per-month breakdown table
+    const byMonth = commitsByMonth(statsRecords);
+    const SHOW_MONTHS = 12;
+    const rows = byMonth.slice(0, SHOW_MONTHS);
+    if (rows.length > 0) {
+      const COL_MONTH = 10;
+      const COL_COUNT = 7;
+      const COL_AUTHOR = 20;
+      const header =
+        "Month".padEnd(COL_MONTH) +
+        "  " +
+        "Commits".padStart(COL_COUNT) +
+        "  " +
+        "Top Author".padEnd(COL_AUTHOR);
+      const divider =
+        "-".repeat(COL_MONTH) +
+        "  " +
+        "-".repeat(COL_COUNT) +
+        "  " +
+        "-".repeat(COL_AUTHOR);
+      process.stderr.write(`${header}\n${divider}\n`);
+      for (const row of rows) {
+        const line =
+          row.month.padEnd(COL_MONTH) +
+          "  " +
+          String(row.count).padStart(COL_COUNT) +
+          "  " +
+          row.topAuthor.padEnd(COL_AUTHOR);
+        process.stderr.write(`${line}\n`);
+      }
+    }
   }
 }
