@@ -55,6 +55,58 @@ export function commitsByAuthor(
     .sort((a, b) => b.count - a.count);
 }
 
+export interface MonthStat {
+  month: string;    // YYYY-MM
+  count: number;
+  topAuthor: string;
+}
+
+/**
+ * Per-month commit breakdown, sorted newest-first.
+ * Returns up to all months present in the data.
+ * Author names are truncated to 20 characters.
+ * Ties for top author are broken alphabetically (first name wins).
+ */
+export function commitsByMonth(records: CommitRecord[]): MonthStat[] {
+  if (records.length === 0) return [];
+
+  // Accumulate per-month author counts: month → Map<author, count>
+  const monthMap = new Map<string, Map<string, number>>();
+
+  for (const r of records) {
+    const d = r.date;
+    const month = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    let authorMap = monthMap.get(month);
+    if (!authorMap) {
+      authorMap = new Map();
+      monthMap.set(month, authorMap);
+    }
+    authorMap.set(r.author, (authorMap.get(r.author) ?? 0) + 1);
+  }
+
+  const result: MonthStat[] = [];
+  for (const [month, authorMap] of monthMap) {
+    let topAuthor = "";
+    let topCount = 0;
+    for (const [author, count] of authorMap) {
+      if (
+        count > topCount ||
+        (count === topCount && author < topAuthor)
+      ) {
+        topAuthor = author;
+        topCount = count;
+      }
+    }
+    const truncated = topAuthor.length > 20 ? topAuthor.slice(0, 20) : topAuthor;
+    result.push({ month, count: [...authorMap.values()].reduce((a, b) => a + b, 0), topAuthor: truncated });
+  }
+
+  // Sort newest-first
+  result.sort((a, b) => b.month.localeCompare(a.month));
+
+  return result;
+}
+
 /**
  * Average commits per day over the date range.
  * Returns 0 for empty input or when all commits fall on the same day (0-day span).
