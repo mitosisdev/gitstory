@@ -4,6 +4,7 @@ import { renderTimeline } from "./renderer.js";
 import { renderGif } from "./gif.js";
 import { wrapSvgInHtml } from "./html.js";
 import { totalCommits, commitsByAuthor, commitsByMonth } from "./stats.js";
+import { resolveStatsMonths } from "./stats-format.js";
 import { parseSince, applySince, type SinceFilter } from "./since.js";
 import { spawnSync } from "child_process";
 import { resolve, basename } from "path";
@@ -36,6 +37,7 @@ if (import.meta.main) {
   let output: string | null = null;
   let htmlOutput: string | null = null;
   let showStats = false;
+  let statsMonthsRaw: string | undefined;
   let sinceFilter: SinceFilter | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -61,6 +63,13 @@ if (import.meta.main) {
       }
     } else if (arg === "--stats") {
       showStats = true;
+    } else if (arg === "--stats-months") {
+      const val = args[++i] ?? null;
+      if (!val) {
+        console.error("error: --stats-months requires a value (e.g. 3)");
+        process.exit(1);
+      }
+      statsMonthsRaw = val;
     } else if (arg === "--since") {
       const val = args[++i] ?? null;
       if (!val) {
@@ -142,8 +151,8 @@ if (import.meta.main) {
 
     // Per-month breakdown table
     const byMonth = commitsByMonth(statsRecords);
-    const SHOW_MONTHS = 12;
-    const rows = byMonth.slice(0, SHOW_MONTHS);
+    const statsMonths = resolveStatsMonths(statsMonthsRaw);
+    const rows = byMonth.slice(0, statsMonths);
     if (rows.length > 0) {
       const COL_MONTH = 10;
       const COL_COUNT = 7;

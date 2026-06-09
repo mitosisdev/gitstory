@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { $ } from "bun";
 import { GIT_LOG_FORMAT, parseGitLog } from "../src/parser.js";
 import { buildSvg, buildGif } from "../src/cli.js";
-import { formatStats } from "../src/stats-format.js";
+import { formatStats, resolveStatsMonths } from "../src/stats-format.js";
 
 const args = process.argv.slice(2);
 const outputIdx = args.indexOf("--output");
@@ -14,6 +14,9 @@ const repoName = repoNameIdx !== -1 ? args[repoNameIdx + 1] : undefined;
 
 const gifMode = args.includes("--gif");
 const showStats = args.includes("--stats");
+const statsMonthsIdx = args.indexOf("--stats-months");
+const statsMonthsRaw = statsMonthsIdx !== -1 ? args[statsMonthsIdx + 1] : undefined;
+const statsMonths = resolveStatsMonths(statsMonthsRaw);
 
 let logInput: string;
 
@@ -52,5 +55,5 @@ if (showStats) {
     date: new Date(c.isoTimestamp),
     message: c.subject,
   }));
-  process.stderr.write(formatStats(records) + "\n");
+  process.stderr.write(formatStats(records, { statsMonths }) + "\n");
 }

@@ -1,6 +1,6 @@
 // src/stats-format.test.ts — TDD tests for the CLI stats formatter
 import { test, expect, describe } from "bun:test";
-import { formatStats } from "./stats-format";
+import { formatStats, resolveStatsMonths } from "./stats-format";
 import type { CommitRecord } from "./stats";
 
 const makeCommit = (
@@ -90,5 +90,90 @@ describe("formatStats", () => {
   test("uses singular 'contributor' for a single author", () => {
     const out = formatStats([makeCommit("z", "solo", d("2026-06-01T10:00:00Z"))]);
     expect(out).toContain("1 contributor ");
+  });
+});
+
+// Build N consecutive months of commits, newest month = 2026-06, going backwards.
+function recordsForMonths(n: number): CommitRecord[] {
+  const out: CommitRecord[] = [];
+  let year = 2026;
+  let month = 6; // June
+  for (let i = 0; i < n; i++) {
+    const mm = String(month).padStart(2, "0");
+    out.push(makeCommit(`h${i}`, "alice", d(`${year}-${mm}-05T10:00:00Z`), "c"));
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return out;
+}
+
+function monthRowCount(out: string): number {
+  return out.split("\n").filter((l) => /^\d{4}-\d{2}/.test(l)).length;
+}
+
+describe("formatStats statsMonths window", () => {
+  test("default (no statsMonths) shows up to 12 months", () => {
+    const records = recordsForMonths(18); // more than 12
+    const out = formatStats(records);
+    expect(monthRowCount(out)).toBe(12);
+  });
+
+  test("statsMonths 3 with 6 months of data shows only the 3 newest months", () => {
+    const records = recordsForMonths(6);
+    const out = formatStats(records, { statsMonths: 3 });
+    expect(monthRowCount(out)).toBe(3);
+    // newest three months present
+    expect(out).toContain("2026-06");
+    expect(out).toContain("2026-05");
+    expect(out).toContain("2026-04");
+    // older months excluded
+    expect(out).not.toContain("2026-03");
+    expect(out).not.toContain("2026-01");
+  });
+
+  test("statsMonths 100 with 2 months of data shows all 2 months (no crash)", () => {
+    const records = recordsForMonths(2);
+    const out = formatStats(records, { statsMonths: 100 });
+    expect(monthRowCount(out)).toBe(2);
+    expect(out).toContain("2026-06");
+    expect(out).toContain("2026-05");
+  });
+
+  test("invalid statsMonths (0) falls back to default of 12", () => {
+    const records = recordsForMonths(18);
+    const out = formatStats(records, { statsMonths: 0 });
+    expect(monthRowCount(out)).toBe(12);
+  });
+
+  test("invalid statsMonths (NaN) falls back to default of 12", () => {
+    const records = recordsForMonths(18);
+    const out = formatStats(records, { statsMonths: NaN });
+    expect(monthRowCount(out)).toBe(12);
+  });
+
+  test("negative statsMonths falls back to default of 12", () => {
+    const records = recordsForMonths(18);
+    const out = formatStats(records, { statsMonths: -5 });
+    expect(monthRowCount(out)).toBe(12);
+  });
+});
+
+describe("resolveStatsMonths", () => {
+  test("returns the number when given a valid positive value", () => {
+    expect(resolveStatsMonths("3")).toBe(3);
+    expect(resolveStatsMonths(7)).toBe(7);
+  });
+  test("falls back to 12 for non-positive, NaN, or non-numeric input", () => {
+    expect(resolveStatsMonths("0")).toBe(12);
+    expect(resolveStatsMonths("-4")).toBe(12);
+    expect(resolveStatsMonths("abc")).toBe(12);
+    expect(resolveStatsMonths(undefined)).toBe(12);
+    expect(resolveStatsMonths(NaN)).toBe(12);
+  });
+  test("truncates fractional values toward zero", () => {
+    expect(resolveStatsMonths("3.9")).toBe(3);
   });
 });
