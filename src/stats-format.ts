@@ -14,17 +14,38 @@
 import { commitsByAuthor, commitsByMonth } from "./stats.js";
 import type { CommitRecord } from "./stats.js";
 
-const SHOW_MONTHS = 12;
+/** Default number of months shown in the per-month breakdown table. */
+export const DEFAULT_STATS_MONTHS = 12;
 const COL_MONTH = 10;
 const COL_COUNT = 7;
 const COL_AUTHOR = 20;
 const GAP = "  ";
 
+export interface StatsOptions {
+  /**
+   * Number of most-recent months to show in the per-month table.
+   * Non-positive, NaN, or non-numeric values fall back to DEFAULT_STATS_MONTHS.
+   */
+  statsMonths?: number;
+}
+
+/**
+ * Normalize a raw --stats-months value (string from argv, number, or undefined)
+ * into a usable positive month count. Anything invalid falls back to the default.
+ */
+export function resolveStatsMonths(raw: string | number | undefined): number {
+  const n =
+    typeof raw === "number" ? raw : raw === undefined ? NaN : Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_STATS_MONTHS;
+  const truncated = Math.trunc(n);
+  return truncated > 0 ? truncated : DEFAULT_STATS_MONTHS;
+}
+
 /**
  * Build the full stats report string (summary line + per-month table).
  * For empty input, returns only the summary line (no table).
  */
-export function formatStats(records: CommitRecord[]): string {
+export function formatStats(records: CommitRecord[], options: StatsOptions = {}): string {
   const total = records.length;
   const byAuthor = commitsByAuthor(records);
   const contributorCount = byAuthor.length;
@@ -35,7 +56,8 @@ export function formatStats(records: CommitRecord[]): string {
     `${total} commits · ${contributorCount} ` +
     `contributor${contributorCount !== 1 ? "s" : ""} · top: ${topStr}`;
 
-  const byMonth = commitsByMonth(records).slice(0, SHOW_MONTHS);
+  const months = resolveStatsMonths(options.statsMonths);
+  const byMonth = commitsByMonth(records).slice(0, months);
   if (byMonth.length === 0) {
     return summary;
   }

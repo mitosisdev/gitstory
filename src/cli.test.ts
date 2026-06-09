@@ -172,6 +172,41 @@ describe("CLI entrypoint", () => {
     }
   });
 
+  it("--stats-months 1 limits the per-month table to one month row", () => {
+    const outFile = "/tmp/test-timeline-stats-months.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--stats", "--stats-months", "1", "--output", outFile]);
+      expect(result.status).toBe(0);
+      const summary = result.stderr as string;
+      // count data rows: lines beginning with YYYY-MM
+      const monthRows = summary
+        .split("\n")
+        .filter((l) => /^\d{4}-\d{2}/.test(l)).length;
+      expect(monthRows).toBeLessThanOrEqual(1);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
+  it("--stats-months with a missing value exits non-zero", () => {
+    const result = runCli([".", "--stats", "--stats-months"]);
+    expect(result.status).not.toBe(0);
+  });
+
+  it("--stats-months with an invalid value falls back gracefully (still succeeds)", () => {
+    const outFile = "/tmp/test-timeline-stats-months-invalid.svg";
+    try {
+      if (existsSync(outFile)) unlinkSync(outFile);
+      const result = runCli([".", "--stats", "--stats-months", "abc", "--output", outFile]);
+      expect(result.status).toBe(0);
+      const summary = result.stderr as string;
+      expect(summary).toMatch(/\d+ commits/);
+    } finally {
+      if (existsSync(outFile)) unlinkSync(outFile);
+    }
+  });
+
   it("--since 1 limits output to 1 commit (count form)", () => {
     const outFile = "/tmp/test-timeline-since-count.svg";
     try {
